@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 class ThemeGenerationRequest(BaseModel):
     """
@@ -31,3 +31,27 @@ class ImageGenerationResponse(BaseModel):
 class ImageStatusResponse(BaseModel):
     status: str = Field(..., description="'pending' if still generating, 'completed' if done.")
     image_url: Optional[str] = Field(None, description="The URL to retrieve the finished image.")
+
+# --- Schemas for Post-Curation (Final Step) ---
+
+class PostCurationRequest(BaseModel):
+    """
+    The request from the frontend containing the user's final artwork selections.
+    """
+    theme_data: Dict[str, Any]
+    selection: List[Dict[str, Any]]
+
+class CuratedArtwork(BaseModel):
+    url: str
+    artwork_title: str
+    artwork_description: str
+
+class CuratedSection(BaseModel):
+    title: str
+    description: str
+    artworks: List[CuratedArtwork]
+
+class FinalCuration(BaseModel):
+    exhibition_title: str
+    introduction: str
+    sections: List[CuratedSection]

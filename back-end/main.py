@@ -1,14 +1,29 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import httpx
 import json
 import random
+from pydantic import BaseModel
+from typing import List, Dict, Any
 
-from schemas import ThemeGenerationRequest, CuratorialResponse, ImageGenerationRequest, ImageGenerationResponse, ImageStatusResponse
+from schemas import ThemeGenerationRequest, CuratorialResponse, ImageGenerationRequest, ImageGenerationResponse, ImageStatusResponse, PostCurationRequest
 
 app = FastAPI(
     title="AI Curatorial System API",
     description="Backend for coordinating LLM (Ollama) and Image Generation (ComfyUI)",
     version="0.1.0"
+)
+
+# Configure CORS to allow requests from the Vue frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173", # Default Vite port
+        "http://127.0.0.1:5173"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 @app.get("/")
@@ -130,3 +145,70 @@ async def check_image_status(prompt_id: str):
                 
         except httpx.RequestError as e:
             raise HTTPException(status_code=503, detail=f"Failed to communicate with ComfyUI: {str(e)}")
+        
+@app.post("/api/curate/post-curation")
+async def post_curation(request: PostCurationRequest):
+    """
+    Takes the selected images and the original theme, and asks Ollama
+    to generate the final exhibition titles, introduction, and artwork descriptions.
+    """
+    system_prompt = """You are a highly acclaimed art curator designing a virtual museum exhibition.
+    The user has selected a series of AI-generated artworks for their sections.
+    Based on the overall theme and the sections provided, you must interpret the exhibition and give it deep meaning.
+    
+    Respond ONLY with a valid JSON object following this exact structure:
+    {
+      "exhibition_title": "A poetic and evocative title for the overall exhibition",
+      "introduction": "A deeply philosophical curatorial introduction (1-2 paragraphs) welcoming the visitor.",
+      "sections": [
+        {
+          "title": "Section Title (keep original)",
+          "description": "Section Description (keep original)",
+          "artworks": [
+            {
+              "url": "image url (keep original)",
+              "artwork_title": "A creative title for this specific artwork",
+              "artwork_description": "A 2-3 sentence interpretation of this artwork's meaning and aesthetics"
+            }
+          ]
+        }
+      ]
+    }
+    """
+
+    # Convert the selection data to a more readable string for the LLM
+    selection_str = json.dumps(request.selection, indent=2)
+    user_prompt = f"Original Theme: {request.theme_data}\n\nSelected Sections and Images:\n{selection_str}"
+
+    try:
+        async with httpx.AsyncClient(timeout=180.0) as client: # Increased timeout for longer generation
+            response = await client.post(
+                "http://localhost:11434/api/chat",
+                json={
+                    "model": "llama3", # Update this if using a different local model
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    "stream": False,
+                    "format": "json" # Forces Ollama to return structured JSON
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            # Ollama returns the message content as a string, we need to parse it into a Python dictionary
+            if "content" not in data.get("message", {}):
+                 raise HTTPException(status_code=500, detail="Ollama response did not contain 'content'.")
+
+            content_str = data["message"]["content"]
+            parsed_content = json.loads(content_str)
+            
+            return {"status": "success", "curation": parsed_content}
+
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=503, detail=f"Failed to connect to Ollama: {e}")
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail=f"Failed to parse JSON response from Ollama. The model might have returned invalid JSON. Content: {content_str}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
