@@ -1,0 +1,13 @@
+Ollama:
+ollama run llama3
+
+ComfyUI:
+cd ..
+cd ComfyUI
+source venv/bin/activate
+python main.py
+
+FastAPI:
+uvicorn main:app --reload
+
+The isolation of modern cities

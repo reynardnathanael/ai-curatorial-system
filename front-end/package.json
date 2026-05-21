@@ -11,6 +11,7 @@
   "dependencies": {
     "@tailwindcss/vite": "^4.2.4",
     "axios": "^1.15.2",
+    "kaboom": "^3000.1.17",
     "pinia": "^3.0.4",
     "tailwindcss": "^4.2.4",
     "vue": "^3.5.32",

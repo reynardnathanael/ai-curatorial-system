@@ -164,8 +164,13 @@ const handleSubmitToPostCuration = async () => {
         theme_data: exhibitionStore.themeData,
         selection: finalSelection
     }).then(response => {
-        // Save the curated data to Pinia!
         exhibitionStore.setFinalExhibition(response.data.curation)
+
+        message.success('Final curation complete! Redirecting to virtual museum...')
+
+        // Compress and pass the data via URL Hash to bypass Cross-Origin port restrictions
+        // const encodedData = encodeURIComponent(JSON.stringify(response.data.curation))
+        // window.location.href = 'http://localhost:5178/#data=' + encodedData
         message.success('Final curation complete! Entering virtual museum...')
         router.push({ name: 'VirtualMuseum' })
     }).catch(error => {
