@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+import base64
 import httpx
 import json
 import random
@@ -44,6 +45,10 @@ async def expand_theme(request: ThemeGenerationRequest):
     if request.style:
         prompt += f"Visual Style: '{request.style}'\n"
     
+    prompt += "\nCRITICAL RULES FOR DESCRIPTIONS:\n"
+    prompt += "- DO NOT start the description with 'This sub-theme...', 'This section...', or 'This exhibition...'.\n"
+    prompt += "- Start directly with the curatorial concept, a philosophical statement, or a poetic observation.\n"
+
     # Instruct the LLM to return a specific JSON structure
     prompt += "\nRespond strictly in JSON format matching the following schema:\n"
     prompt += "{\n"
@@ -172,7 +177,6 @@ async def post_curation(request: PostCurationRequest):
           "description": "Section Description (keep original)",
           "artworks": [
             {
-              "url": "image url (keep original)",
               "artwork_title": "A creative, metaphorical, or philosophical title for this specific artwork",
               "artwork_description": "A detailed and philosophical interpretation of this artwork (at least 4-5 sentences). Analyze its symbolism, composition, and emotional resonance. Connect it to broader artistic or humanistic themes. Completely avoid repetitive sentence structures and formulaic phrasing."
             }
@@ -182,39 +186,137 @@ async def post_curation(request: PostCurationRequest):
     }
     """
 
-    # Convert the selection data to a more readable string for the LLM
-    selection_str = json.dumps(request.selection, indent=2)
-    user_prompt = f"Original Theme: {request.theme_data}\n\nSelected Sections and Images:\n{selection_str}"
+    # Convert the selection data to a more readable string for the LLM.
+    # (We safely convert Pydantic objects to dicts here to avoid JSON serialization errors)
+    selection_data = [
+        s.model_dump() if hasattr(s, "model_dump") else (s.dict() if hasattr(s, "dict") else s) 
+        for s in request.selection
+    ]
 
     try:
-        async with httpx.AsyncClient(timeout=180.0) as client: # Increased timeout for longer generation
-            response = await client.post(
+        async with httpx.AsyncClient(timeout=600.0) as client: # Extended timeout for sequential processing
+            
+            # ---------------------------------------------------------
+            # STEP 1: MACRO CURATION (Exhibition Intro)
+            # We use standard Llama3 to synthesize the overarching theme.
+            # ---------------------------------------------------------
+            intro_system = "You are an expert art curator. Respond ONLY with a valid JSON object containing exactly two keys: 'exhibition_title' and 'introduction'."
+            intro_user = f"Theme: {request.theme_data}\n\nWrite a poetic exhibition title and a deep, philosophical 2-paragraph introduction for this art collection."
+            
+            intro_response = await client.post(
                 "http://localhost:11434/api/chat",
                 json={
-                    "model": "llama3", # Update this if using a different local model
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ],
+                    "model": "llama3",
+                    "messages": [{"role": "system", "content": intro_system}, {"role": "user", "content": intro_user}],
                     "stream": False,
-                    "format": "json" # Forces Ollama to return structured JSON
-                },
+                    "format": "json"
+                }
             )
-            response.raise_for_status()
-            data = response.json()
+            intro_response.raise_for_status()
             
-            # Ollama returns the message content as a string, we need to parse it into a Python dictionary
-            if "content" not in data.get("message", {}):
-                 raise HTTPException(status_code=500, detail="Ollama response did not contain 'content'.")
+            try:
+                intro_data = json.loads(intro_response.json()["message"]["content"])
+            except Exception:
+                intro_data = {}
+                
+            final_curation = {
+                "exhibition_title": intro_data.get("exhibition_title", "An Exploration of Form and Concept"),
+                "introduction": intro_data.get("introduction", "Welcome to this curated selection of aesthetic expressions..."),
+                "sections": []
+            }
+            
+            # ---------------------------------------------------------
+            # STEP 2: MICRO CURATION (Vision Model per Artwork)
+            # We loop through images sequentially, passing 1 image at a time
+            # to llama3.2-vision. This guarantees maximum visual attention
+            # and 100% perfect JSON formatting!
+            # ---------------------------------------------------------
+            for s_idx, original_section in enumerate(selection_data):
+                new_section = {
+                    "title": original_section.get("title", f"Section {s_idx + 1}"),
+                    "description": original_section.get("description", ""),
+                    "artworks": []
+                }
+                
+                for a_idx, img_url in enumerate(original_section.get("selected_images", [])):
+                    print(f"👁️ Visually analyzing image {a_idx + 1} for {new_section['title']}...")
+                    try:
+                        # Fetch Base64
+                        fetch_url = img_url.replace("localhost", "127.0.0.1")
+                        img_response = await client.get(fetch_url)
+                        img_response.raise_for_status()
+                        b64_str = base64.b64encode(img_response.content).decode("utf-8")
+                        
+                        vision_system = "You are a master art curator. Respond ONLY with a valid JSON object containing exactly two keys: 'artwork_title' and 'artwork_description'."
+                        vision_user = (
+                            f"This artwork belongs to the exhibition section: '{new_section['title']}'.\n"
+                            "1. Create a highly unique, metaphorical 'artwork_title' for this specific piece. DO NOT reuse the section title. Avoid cliché art words like 'Ephemeral', 'Resonance', or 'Whispers'.\n"
+                            "2. Write a philosophical 'artwork_description' analyzing its visual elements.\n"
+                            "CRITICAL RULES:\n"
+                            "- Keep it STRICTLY between 4 to 5 sentences.\n"
+                            "- DO NOT start the description with 'This piece, [Title], ...' or 'This artwork...'. Start directly with the visual analysis.\n"
+                            "- DO NOT include the artwork title in the description body.\n"
+                            "- DO NOT mention it is AI generated."
+                        )
+                        
+                        vision_response = await client.post(
+                            "http://localhost:11434/api/chat",
+                            json={
+                                "model": "llama3.2-vision", # Utilizing the superior vision model!
+                                "messages": [
+                                    {"role": "system", "content": vision_system},
+                                    {"role": "user", "content": vision_user, "images": [b64_str]}
+                                ],
+                                "stream": False,
+                                "format": "json",
+                                "options": {
+                                    "temperature": 0.4, # Lower temp to prevent repetitive hallucination loops
+                                    "num_predict": 300  # Hard token limit to strictly prevent overkill lengths
+                                }
+                            }
+                        )
+                        vision_response.raise_for_status()
+                        content_str = vision_response.json()["message"]["content"]
+                        
+                        try:
+                            art_data = json.loads(content_str)
+                        except json.JSONDecodeError as json_err:
+                            print(f"⚠️ Minor JSON formatting error from Vision model. Activating Salvage Protocol... Details: {json_err}")
+                            import re
+                            art_data = {}
+                            
+                            title_match = re.search(r'"artwork_title"\s*:\s*"(.*?)(?<!\\)"', content_str)
+                            if title_match:
+                                art_data["artwork_title"] = title_match.group(1)
+                                
+                            desc_match = re.search(r'"artwork_description"\s*:\s*"([\s\S]*?)(?:"\s*,|"\s*\}|"\s*\]|$)', content_str)
+                            if desc_match:
+                                art_data["artwork_description"] = desc_match.group(1).strip()
+                        
+                        new_section["artworks"].append({
+                            "url": img_url,
+                            "artwork_title": art_data.get("artwork_title", "Untitled Aesthetic"),
+                            "artwork_description": art_data.get("artwork_description", "A profound visual exploration.")
+                        })
+                    except Exception as e:
+                        print(f"⚠️ Failed to analyze image: {e}")
+                        new_section["artworks"].append({
+                            "url": img_url,
+                            "artwork_title": "Untitled Aesthetic",
+                            "artwork_description": "A profound visual exploration."
+                        })
+                    
+                final_curation["sections"].append(new_section)
 
-            content_str = data["message"]["content"]
-            parsed_content = json.loads(content_str)
-            
-            return {"status": "success", "curation": parsed_content}
+            return {"status": "success", "curation": final_curation}
 
     except httpx.RequestError as e:
         raise HTTPException(status_code=503, detail=f"Failed to connect to Ollama: {e}")
     except json.JSONDecodeError:
         raise HTTPException(status_code=500, detail=f"Failed to parse JSON response from Ollama. The model might have returned invalid JSON. Content: {content_str}")
+    except HTTPException:
+        raise
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")

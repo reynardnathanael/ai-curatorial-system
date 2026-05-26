@@ -11,3 +11,9 @@ FastAPI:
 uvicorn main:app --reload
 
 The isolation of modern cities
+
+Emotional Landscapes
+
+Turbulent
+
+Impasto

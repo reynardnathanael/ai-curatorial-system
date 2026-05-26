@@ -149,11 +149,13 @@ const canSubmit = computed(() => {
 
 const handleSubmitToPostCuration = async () => {
     isSubmitting.value = true
+    const loadingMessage = message.loading('AI is visually analyzing your selected artworks. This may take a few minutes...', { duration: 0 })
 
     // Collect all selected images grouped by section
     const finalSelection = sections.value.map(section => ({
         title: section.title,
         description: section.description,
+        image_prompt: section.image_prompt,
         selected_images: section.images.filter(img => img.selected).map(img => img.url)
     }))
 
@@ -163,10 +165,11 @@ const handleSubmitToPostCuration = async () => {
     api.post('/curate/post-curation', {
         theme_data: exhibitionStore.themeData,
         selection: finalSelection
-    }).then(response => {
+    }, { timeout: 300000 }).then(response => { // 5-minute timeout for vision processing
+        loadingMessage.destroy()
         exhibitionStore.setFinalExhibition(response.data.curation)
 
-        message.success('Final curation complete! Redirecting to virtual museum...')
+        // message.success('Final curation complete! Redirecting to virtual museum...')
 
         // Compress and pass the data via URL Hash to bypass Cross-Origin port restrictions
         // const encodedData = encodeURIComponent(JSON.stringify(response.data.curation))
@@ -174,6 +177,7 @@ const handleSubmitToPostCuration = async () => {
         message.success('Final curation complete! Entering virtual museum...')
         router.push({ name: 'VirtualMuseum' })
     }).catch(error => {
+        loadingMessage.destroy()
         message.error('Failed to get final curation. Please try again.')
         console.error(error)
     }).finally(() => {
