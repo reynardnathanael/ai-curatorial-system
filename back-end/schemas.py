@@ -2,9 +2,6 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 
 class ThemeGenerationRequest(BaseModel):
-    """
-    The initial request from the user containing the exhibition concepts.
-    """
     theme: str = Field(..., description="The high-level theme (e.g., 'memory, loneliness, future city')")
     mood: Optional[str] = Field(None, description="Desired mood or atmosphere")
     style: Optional[str] = Field(None, description="Desired visual style or art movement")
@@ -16,7 +13,6 @@ class SubTheme(BaseModel):
     image_prompt: str = Field(..., description="A detailed visual prompt for the image generation model (ComfyUI/Stable Diffusion)")
 
 class CuratorialResponse(BaseModel):
-    # We will expand this later to include the LLM's expanded themes and prompts
     status: str
     sub_themes: Optional[List[SubTheme]] = None
 
@@ -32,12 +28,7 @@ class ImageStatusResponse(BaseModel):
     status: str = Field(..., description="'pending' if still generating, 'completed' if done.")
     image_url: Optional[str] = Field(None, description="The URL to retrieve the finished image.")
 
-# --- Schemas for Post-Curation (Final Step) ---
-
 class PostCurationRequest(BaseModel):
-    """
-    The request from the frontend containing the user's final artwork selections.
-    """
     theme_data: Dict[str, Any]
     selection: List[Dict[str, Any]]
 

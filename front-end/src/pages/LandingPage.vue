@@ -158,13 +158,10 @@ const handleCurate = (e) => {
 </script>
 
 <style scoped>
-/* Projector-friendly component text sizing */
 :deep(.n-form-item-label) {
     font-size: 1.125rem !important;
-    /* Equivalent to text-lg */
     font-weight: 600 !important;
     color: #1f2937 !important;
-    /* Equivalent to text-gray-800 */
 }
 
 :deep(.n-input .n-input__input-el),
@@ -172,7 +169,6 @@ const handleCurate = (e) => {
 :deep(.n-input-number .n-input__input-el) {
     font-size: 1.125rem !important;
     color: #111827 !important;
-    /* Equivalent to text-gray-900 */
 }
 
 :deep(.n-button .n-button__content) {

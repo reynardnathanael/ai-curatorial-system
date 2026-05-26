@@ -97,13 +97,10 @@ onMounted(() => {
     }
 
     // The data from the store now contains the complete image URLs.
-    // We just need to add the 'selected' property for UI state.
     sections.value = exhibitionStore.subThemes.map(theme => {
         return {
             ...theme,
-            // The 'images' array from the store contains URLs. We map it to an object with a 'selected' state.
             images: theme.images.map(imageUrl => ({
-                // Replace 127.0.0.1 with localhost to prevent browser Cross-Origin blocking, and remove accidental quotes
                 url: String(imageUrl).replace('127.0.0.1', 'localhost').replace(/['"]/g, ''),
                 selected: false
             }))
@@ -111,7 +108,7 @@ onMounted(() => {
     })
 })
 
-// --- SELECTION LOGIC ---
+// Selection logic for artworks
 const toggleSelection = (sectionIndex, imgIndex) => {
     const section = sections.value[sectionIndex]
     const img = section.images[imgIndex]
@@ -165,15 +162,9 @@ const handleSubmitToPostCuration = async () => {
     api.post('/curate/post-curation', {
         theme_data: exhibitionStore.themeData,
         selection: finalSelection
-    }, { timeout: 300000 }).then(response => { // 5-minute timeout for vision processing
+    }, { timeout: 300000 }).then(response => { // 5-minute timeout
         loadingMessage.destroy()
         exhibitionStore.setFinalExhibition(response.data.curation)
-
-        // message.success('Final curation complete! Redirecting to virtual museum...')
-
-        // Compress and pass the data via URL Hash to bypass Cross-Origin port restrictions
-        // const encodedData = encodeURIComponent(JSON.stringify(response.data.curation))
-        // window.location.href = 'http://localhost:5178/#data=' + encodedData
         message.success('Final curation complete! Entering virtual museum...')
         router.push({ name: 'VirtualMuseum' })
     }).catch(error => {

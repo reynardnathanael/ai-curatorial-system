@@ -24,7 +24,7 @@
             class="absolute inset-0 bg-black/80 flex items-center justify-center z-50 p-4 md:p-8 backdrop-blur-sm transition-opacity"
             @click.self="closeModal">
 
-            <!-- Main Section Modal (Light Theme) -->
+            <!-- Main Section Modal -->
             <div
                 class="bg-white rounded-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto p-8 md:p-12 shadow-2xl relative border border-gray-200">
                 <!-- Close Button -->
