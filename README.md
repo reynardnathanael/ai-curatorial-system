@@ -2,7 +2,11 @@
 
 An intelligent, multi-model web application that acts as a virtual art curator. It generates deeply philosophical exhibition themes, creates unique artworks, and visually analyzes the generated pieces to produce museum-quality curatorial descriptions.
 
-![Framework](framework.png)
+![Framework](framework.jpg)
+
+## 🎥 Demonstration
+
+<video src="./demo.mp4" controls="controls" width="100%"></video>
 
 ## ✨ Key Features
 
@@ -96,3 +100,15 @@ _Runs by default on `http://localhost:5173`_
 4. Select 2-3 artworks per section.
 5. Proceed to the Final Curation, where the Vision model will visually analyze your selections and write the museum placards.
 6. Enjoy your virtual museum exhibition!
+
+---
+
+## 🔗 Acknowledgments & References
+
+This project implementation is based on and made possible by these incredible tools and resources:
+
+- [Vue.js](https://vuejs.org/)
+- [FastAPI](https://fastapi.tiangolo.com/)
+- [Ollama](https://ollama.com/)
+- [ComfyUI](https://comfy.org/)
+- [2D Portfolio Kaboom (JSLegendDev)](https://github.com/JSLegendDev/2d-portfolio-kaboom)
