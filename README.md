@@ -6,7 +6,7 @@ An intelligent, multi-model web application that acts as a virtual art curator. 
 
 ## 🎥 Demonstration
 
-<video src="./demo.mp4" controls="controls" width="100%"></video>
+<video src="https://github.com/reynardnathanael/ai-curatorial-system/raw/refs/heads/main/demo.mp4" controls="controls" width="100%"></video>
 
 ## ✨ Key Features
 
